@@ -80,7 +80,7 @@ export class RelayDO {
     this.env = env;
     this.senderWs = null;      // cf-send 的 WebSocket
     this.meta = null;          // { name, size, mime, key }
-    this.downloads = new Map(); // connId -> { controller, writer, closed }
+    this.downloads = new Map(); // connId -> { writer, closed }
     this.heartbeatTimer = null;
     this.lastPong = 0;
   }
@@ -107,6 +107,7 @@ export class RelayDO {
     server.binaryType = 'arraybuffer';
 
     // 踢掉旧连接，防止数据错发
+    const hadOld = !!this.senderWs;
     if (this.senderWs) {
       try { this.senderWs.close(4003, 'Replaced by new connection'); } catch {}
       this.abortAllDownloads();
@@ -116,6 +117,9 @@ export class RelayDO {
 
     this.senderWs = server;
     this.lastPong = Date.now();
+    this.registeredAt = Date.now();
+    this.totalBytes = 0;
+    console.log('sender registered', JSON.stringify({ channelId: this.channelId || null, replaced: hadOld }));
     this.startHeartbeat();
 
     server.addEventListener('message', (ev) => this.onSenderMessage(ev));
@@ -140,7 +144,7 @@ export class RelayDO {
         const dl = this.downloads.get(msg.connId);
         if (dl) {
           if (msg.t === 'err') {
-            try { dl.controller.error(new Error(msg.message || 'sender error')); } catch {}
+            try { dl.writer.abort(new Error(msg.message || 'sender error')).catch(() => {}); } catch {}
           } else {
             try { dl.writer.close(); } catch {}
           }
@@ -167,6 +171,11 @@ export class RelayDO {
 
   onSenderClose(ws) {
     if (ws !== this.senderWs) return; // 已被新连接替换
+    console.log('sender ws closed', JSON.stringify({
+      channelId: this.channelId || null,
+      activeDownloads: this.downloads.size,
+      uptimeMs: this.registeredAt ? Date.now() - this.registeredAt : null,
+    }));
     this.senderWs = null;
     this.meta = null;
     this.stopHeartbeat();
@@ -175,7 +184,7 @@ export class RelayDO {
 
   abortAllDownloads() {
     for (const [connId, dl] of this.downloads) {
-      try { dl.controller.error(new Error('sender disconnected')); } catch {}
+      try { dl.writer.abort(new Error('sender disconnected')).catch(() => {}); } catch {}
       this.downloads.delete(connId);
     }
   }
@@ -270,7 +279,7 @@ export class RelayDO {
 
     const { readable, writable } = new FixedLengthStream(end - start + 1);
     const writer = writable.getWriter();
-    this.downloads.set(connId, { controller: writer, writer, closed: false });
+    this.downloads.set(connId, { writer, closed: false });
 
     // 发送下载请求（带结束边界，sender 只发 [start, end] 区间）
     try {
@@ -286,7 +295,7 @@ export class RelayDO {
       if (dl) {
         dl.closed = true;
         this.downloads.delete(connId);
-        try { dl.writer.releaseLock(); writable.abort().catch(() => {}); } catch {}
+        try { writer.abort().catch(() => {}); } catch {}
         try { this.senderWs?.send(JSON.stringify({ t: 'abort', connId })); } catch {}
       }
     });
