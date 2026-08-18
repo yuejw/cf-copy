@@ -1,4 +1,4 @@
-# CfCopy
+# Cf-Copy
 
 基于 Cloudflare Worker + Durable Object 的大文件中继服务，帮助**无法直连的两台机器**复制文件：
 一端运行 `cf-send`（发送方），另一端用浏览器 / curl / wget / IDM 等任意 HTTP 工具下载（接收方）。
@@ -8,6 +8,22 @@
 - 💤 发送端在线才可下载；`cf-send` 未运行时下载地址返回 **404**
 - 🔗 下载地址带随机密钥，难以被猜到
 - 💰 免费计划即可运行（数据流式转发，不占 Worker 请求时长）
+
+## 快速开始（只想使用，不想自建）
+
+不需要部署任何东西：直接下载本仓库的 [`send.mjs`](./send.mjs)（零依赖，Node ≥ 22），使用作者提供的公共服务即可：
+
+```bash
+# 下载 send.mjs 后，直接指定文件
+node send.mjs big-file.zip --server https://cf-copy.yuejw.ccwu.cc
+
+# 或者 Windows 下不带参数，弹出文件选择对话框
+node send.mjs --server https://cf-copy.yuejw.ccwu.cc
+```
+
+运行后会打印一个下载地址，发给接收方用浏览器（或 curl/wget/IDM）打开即可，详见下方[使用](#使用)。
+
+> 公共服务即本项目作者自建的 Worker 实例，仅供试用；文件数据不经落盘、仅中转，但如介意可按下文自行部署。
 
 ## 架构
 
@@ -42,7 +58,7 @@ wrangler login                        # 打开浏览器登录 Cloudflare 账号
 ### 方式 B：安装到项目目录
 
 ```bash
-cd Cfcopy                              # 先进入本项目目录，避免污染其他目录
+cd cf-copy                              # 先进入本项目目录，避免污染其他目录
 npm install --save-dev --allow-scripts=esbuild,workerd wrangler
 npx wrangler login
 ```
@@ -53,13 +69,14 @@ npx wrangler login
 
 ### 部署
 
-1. 修改 `wrangler.toml` 里的 `name = "cfcopy"`（可选，默认即可）。
+1. 修改 `wrangler.toml` 里的 `name = "cf-copy"`（可选，默认即可）。
 2. 部署：
    ```bash
    wrangler deploy        # 方式 A
    npx wrangler deploy    # 方式 B
    ```
-   记下输出的 `https://cfcopy.<你的子域>.workers.dev`。
+   记下输出的 `https://cf-copy.<你的cf账号>.workers.dev`。
+   如果 wrangler.toml 里面配置了自己域名（见下方说明）则这里输出的是自己域名，例如：`https://cf-copy.yuejw.ccwu.cc`
 
 ### ⚠️ 国内用户必读：workers.dev 域名存在 DNS 污染
 
@@ -71,13 +88,13 @@ npx wrangler login
 2. 在 `wrangler.toml` 中添加 `routes` 配置（本项目已自带示例，替换成你自己的域名）：
    ```toml
    routes = [
-     { pattern = "copy.你的域名.com", custom_domain = true }
+     { pattern = "cf-copy.yuejw.ccwu.cc", custom_domain = true }
    ]
    ```
-   例如本项目的实际配置是 `copy.yuejw.ccwu.cc`。部署时 Cloudflare 会自动创建 DNS 记录并签发证书；
-3. 重新 `wrangler deploy`，之后所有地址都用 `https://copy.你的域名.com` 代替 `https://cfcopy.xxx.workers.dev`。
+   例如本项目的实际配置是 `cf-copy.yuejw.ccwu.cc`。部署时 Cloudflare 会自动创建 DNS 记录并签发证书；
+3. 重新 `wrangler deploy`，之后所有地址都用 `https://cf-copy.yuejw.ccwu.cc` 代替 `https://cf-copy.<你的cf账号>.workers.dev`。
 
-验证：访问 `https://copy.你的域名.com/health`，返回 `{"status":"ok"}` 即部署成功。
+验证：访问 `https://cf-copy.yuejw.ccwu.cc/health`，返回 `{"status":"ok"}` 即部署成功。
 
 ## 使用
 
@@ -85,16 +102,16 @@ npx wrangler login
 
 ```bash
 # 方式一：直接指定文件
-node send.mjs big-file.zip --server https://cfcopy.xxx.workers.dev
+node send.mjs big-file.zip --server https://cf-copy.<你的cf账号>.workers.dev
 
 # 方式二：Windows 下不带参数，弹出文件选择对话框
-node send.mjs --server https://cfcopy.xxx.workers.dev
+node send.mjs --server https://cf-copy.<你的cf账号>.workers.dev
 ```
 
 也可以用环境变量代替 `--server`：
 
 ```bash
-export CFCOPY_SERVER=https://cfcopy.xxx.workers.dev
+export CFCOPY_SERVER=https://cf-copy.<你的cf账号>.workers.dev
 node send.mjs big-file.zip
 ```
 
@@ -104,10 +121,10 @@ node send.mjs big-file.zip
 ✅ 通道已建立，等待接收方下载
 📄 文件: big-file.zip (1.2 GB)
 
-⬇️  下载地址: https://cfcopy.xxx.workers.dev/d/ab12cd34/xxxxx
+⬇️  下载地址: https://cf-copy.<你的cf账号>.workers.dev/d/ab12cd34/xxxxx
 
 接收端示例（支持断点续传）:
-   curl -L -O -C - "https://cfcopy.xxx.workers.dev/d/ab12cd34/xxxxx"
+   curl -L -O -C - "https://cf-copy.<你的cf账号>.workers.dev/d/ab12cd34/xxxxx"
 ```
 
 ### 接收端
