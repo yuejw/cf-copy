@@ -67,6 +67,7 @@ export default {
       const doUrl = new URL(request.url);
       doUrl.pathname = '/download/' + m[2];
       doUrl.searchParams.set('originalPath', url.pathname);
+      doUrl.searchParams.set('cid', m[1]);
       return stub.fetch(new Request(doUrl, request));
     }
 
@@ -225,10 +226,16 @@ export class RelayDO {
 
     const meta = this.meta;
 
+    // 稳定的资源标识（channelId + 文件大小），供浏览器 If-Range 校验，
+    // 使"继续下载"按钮能真正断点续传而不是从头开始
+    const etag = '"cfcopy-' + (url.searchParams.get('cid') || '') + '-' + meta.size + '"';
+    const ifRange = request.headers.get('if-range');
+
     // 解析 Range: bytes=N- / bytes=N-M
     let start = 0, end = meta.size - 1, isRange = false;
     const rangeHeader = request.headers.get('range');
-    if (rangeHeader) {
+    if (rangeHeader && (!ifRange || ifRange === etag)) {
+      // If-Range 不匹配（资源已变化）时忽略 Range，返回完整 200
       const m = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
       if (!m || (!m[1] && !m[2])) {
         return new Response('Invalid Range', { status: 416, headers: cors });
@@ -257,6 +264,8 @@ export class RelayDO {
       'content-type': meta.mime,
       'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(meta.name)}`,
       'content-length': String(end - start + 1),
+      'etag': etag,
+      'cache-control': 'no-store',
     };
     if (isRange) {
       headers['content-range'] = `bytes ${start}-${end}/${meta.size}`;
