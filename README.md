@@ -38,7 +38,7 @@ cf-send (Node.js CLI)                         浏览器 / curl / wget / IDM
 
 发送端不主动推数据：只有当有人访问下载 URL 时，DO 才通知 `cf-send` 从指定偏移开始读文件并流式回传。
 
-## 部署
+## 安装wrangler（用来部署cloudflare项目）
 
 需要 Node ≥ 18。任选下面**一种**方式安装 wrangler。
 
@@ -67,7 +67,7 @@ npx wrangler login
 
 > ⚠️ 注意 `npm install`（不带 `-g`）装到的是**当前目录**。如果在家目录（如 `C:\Users\你`）执行，会在那里生成 `node_modules`、`package.json` 等垃圾文件——发现装错位置时删掉这三个即可：`node_modules/`、`package.json`、`package-lock.json`。
 
-### 部署
+### 部署本项目服务端到cloudflare
 
 1. 修改 `wrangler.toml` 里的 `name = "cf-copy"`（可选，默认即可）。
 2. 部署：
