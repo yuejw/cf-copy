@@ -49,8 +49,6 @@ npx wrangler login
 
 此方式下所有 wrangler 命令都要通过 `npx` 调用（npx 会自动找到 `node_modules` 里的 wrangler）。
 
-此方式下所有 wrangler 命令都要通过 `npx` 调用（npx 会自动找到 `node_modules` 里的 wrangler）。
-
 > ⚠️ 注意 `npm install`（不带 `-g`）装到的是**当前目录**。如果在家目录（如 `C:\Users\你`）执行，会在那里生成 `node_modules`、`package.json` 等垃圾文件——发现装错位置时删掉这三个即可：`node_modules/`、`package.json`、`package-lock.json`。
 
 ### 部署
@@ -62,6 +60,24 @@ npx wrangler login
    npx wrangler deploy    # 方式 B
    ```
    记下输出的 `https://cfcopy.<你的子域>.workers.dev`。
+
+### ⚠️ 国内用户必读：workers.dev 域名存在 DNS 污染
+
+默认的 `*.workers.dev` 域名在国内网络环境下**普遍存在 DNS 污染**：域名会被解析到错误的 IP，导致 `wrangler deploy` 能成功（走的是 API 域名），但发送端连接、浏览器访问全部超时，WebSocket 直接异常关闭（code=1006）。
+
+解决办法是申请一个自己的域名并托管到 Cloudflare，然后通过 `routes` 给 Worker 绑定自定义域名：
+
+1. 在 Cloudflare 控制台添加你的域名（免费计划即可），按提示把域名 NS 记录改到 Cloudflare；
+2. 在 `wrangler.toml` 中添加 `routes` 配置（本项目已自带示例，替换成你自己的域名）：
+   ```toml
+   routes = [
+     { pattern = "copy.你的域名.com", custom_domain = true }
+   ]
+   ```
+   例如本项目的实际配置是 `copy.yuejw.ccwu.cc`。部署时 Cloudflare 会自动创建 DNS 记录并签发证书；
+3. 重新 `wrangler deploy`，之后所有地址都用 `https://copy.你的域名.com` 代替 `https://cfcopy.xxx.workers.dev`。
+
+验证：访问 `https://copy.你的域名.com/health`，返回 `{"status":"ok"}` 即部署成功。
 
 ## 使用
 
