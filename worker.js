@@ -157,7 +157,8 @@ export class RelayDO {
     // 二进制数据帧：[4字节connId][chunk]
     const buf = new Uint8Array(ev.data);
     if (buf.length < 4) return;
-    const connId = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
+    // >>> 0 保证无符号（connId ≥ 2^31 时位运算结果为负数，会导致 Map 键不匹配）
+    const connId = ((buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3]) >>> 0;
     const dl = this.downloads.get(connId);
     if (!dl || dl.closed) return;
     try {
