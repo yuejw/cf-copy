@@ -91,6 +91,31 @@ let url = `${server}/register?id=${channelId}`;
 if (registerKey) url += `&rk=${encodeURIComponent(registerKey)}`;
 console.log(`正在连接 ${server} ...`);
 
+// 预检：先用普通 HTTP 请求探测，把服务端拒绝的具体原因打出来
+// （WebSocket 的 error 事件不携带 HTTP 状态码，只能显示笼统的 1006）
+try {
+  const probe = await fetch(url);
+  if (probe.status === 403) {
+    console.error('❌ 注册被拒绝（403）：服务端开启了注册密码，请用 --key <密码> 提供正确的密码。');
+    process.exit(1);
+  }
+  if (probe.status === 400) {
+    const body = await probe.json().catch(() => ({}));
+    if (body.error === 'bad channel id') {
+      console.error('❌ 注册被拒绝（400）：通道 id 不合法。');
+      process.exit(1);
+    }
+    // error === 'expected websocket' 是正常情况，继续走 WS 升级
+  } else if (!probe.ok) {
+    console.error(`❌ 服务端返回异常状态 ${probe.status}，无法注册。`);
+    process.exit(1);
+  }
+} catch (e) {
+  console.error(`❌ 无法连接服务器 ${server}：${e.message}`);
+  console.error('   请检查 --server 地址是否正确、网络是否可达。');
+  process.exit(1);
+}
+
 const ws = new WebSocket(url);
 ws.binaryType = 'nodebuffer';
 
