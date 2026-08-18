@@ -515,6 +515,9 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
                 (rkInput.value.trim() ? '&rk=' + encodeURIComponent(rkInput.value.trim()) : '');
     var ws = null;
     ch.connect = function () {
+      // 已有活连接或已有等待中的重连时不重复连接（防止重连风暴/自我踢线）
+      if (ch.ws && ch.ws.readyState === 1) return;
+      if (ch.reconnectTimer) { clearTimeout(ch.reconnectTimer); ch.reconnectTimer = null; }
       badge.textContent = '连接中…';
       badge.className = 'badge';
       card.classList.remove('dead');
@@ -532,7 +535,9 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
         renderStats();
       };
       s.onclose = function (ev) {
-        if (ch.dead) return;
+        // 只处理"当前 socket"的关闭；被替换的旧 socket 迟到的 close 事件直接忽略，
+        // 否则会误杀新连接上的下载并引发重连风暴
+        if (ch.dead || ch.ws !== s) return;
         // 意外断开：把进行中的连接标记取消，然后自动重连（URL 不变）
         ch.conns.forEach(function (c, id) { stopConnById(ch, id, '连接中断'); });
         ch.retries = (ch.retries || 0) + 1;
