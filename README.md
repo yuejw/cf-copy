@@ -11,19 +11,29 @@
 
 ## 快速开始（只想使用，不想自建）
 
-不需要部署任何东西：直接下载本仓库的 [`send.mjs`](./send.mjs)（零依赖，Node ≥ 22），使用作者提供的公共服务即可：
+不需要部署任何东西，两种方式任选：
+
+### 方式一：网页版（推荐，无需任何命令行）
+
+1. 浏览器打开公共服务地址：**https://cf-copy.yuejw.ccwu.cc**
+2. 输入注册密码（**向作者 [@yuejw](https://github.com/yuejw) 索要**，页面会记住，下次免输）；
+3. 点击或拖入文件（可一次多选），每个文件生成独立的下载链接；
+4. 页面实时显示每个文件的下载情况：每条连接的进度条、已发送/剩余字节、发送缓冲、下载人数；
+5. 把链接发给接收方即可。**发送期间保持页面打开**，关闭/刷新页面链接即失效（404）。
+
+### 方式二：send.mjs 命令行（Node ≥ 22，零依赖）
 
 ```bash
 # 下载 send.mjs 后，直接指定文件
-node send.mjs big-file.zip --server https://cf-copy.yuejw.ccwu.cc
+node send.mjs big-file.zip --server https://cf-copy.yuejw.ccwu.cc --key <向作者索要>
 
 # 或者 Windows 下不带参数，弹出文件选择对话框
-node send.mjs --server https://cf-copy.yuejw.ccwu.cc
+node send.mjs --server https://cf-copy.yuejw.ccwu.cc --key <向作者索要>
 ```
 
-运行后会打印一个下载地址，发给接收方用浏览器（或 curl/wget/IDM）打开即可，详见下方[使用](#使用)。
+运行后会打印下载地址，发给接收方即可。
 
-> 公共服务即本项目作者自建的 Worker 实例，**已开启注册密码：使用前请向作者（[@yuejw](https://github.com/yuejw)）索要 key**，并在命令中加上 `--key <索要到的key>`（详见[服务密码](#服务密码register_key可选)）。文件数据不经落盘、仅中转，但如介意可按下文自行部署。
+> 公共服务即本项目作者自建的 Worker 实例，**已开启注册密码：使用前请向作者索要 key**（详见[服务密码](#服务密码register_key可选)）。文件数据不经落盘、仅中转，但如介意可按下文自行部署。
 
 ## 架构
 
