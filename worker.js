@@ -371,7 +371,7 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
 <body>
 <div class="wrap">
   <h1>Cf-Copy 文件发送</h1>
-  <div class="sub">选择文件后生成下载链接发给对方。对方可用浏览器或任意下载工具（支持断点续传）接收。</div>
+  <div class="sub">选择文件后生成下载链接发给对方。对方可用浏览器或任意下载工具（支持断点续传）接收。<br>进度含义：<b>已发送到服务器的字节数</b>——中间经过 Cloudflare 缓冲，最终是否送达以接收端下载完成为准（建议传完校验哈希）。</div>
 
   <div class="warn">⚠️ 发送期间请<b>保持本页面打开</b>：关闭或刷新页面，所有下载链接立即失效。</div>
 
@@ -598,7 +598,7 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
           st.sent += buf.byteLength;
           c.totalSent += buf.byteLength;
           var pct = Math.floor(st.sent * 100 / st.total);
-          right.textContent = fmt(st.sent) + ' / ' + fmt(st.total) + '（剩 ' + fmt(st.total - st.sent) + '）';
+          right.textContent = '已发 ' + fmt(st.sent) + ' / ' + fmt(st.total);
           barFill.style.width = pct + '%';
         }
       } catch (e) {
@@ -610,7 +610,7 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
       c.conns.delete(connId);
       row.classList.add('done');
       barFill.style.width = '100%';
-      right.textContent = '完成 ✔';
+      right.textContent = '已发完（是否送达以接收端为准）';
       w.send(JSON.stringify({ t: 'eof', connId: connId }));
     }
 
