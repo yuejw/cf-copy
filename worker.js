@@ -145,7 +145,9 @@ export class RelayDO {
     try {
       dl.writer.write(buf.slice(4));
     } catch {
+      // 写入失败 = 接收端已断开：清理并通知 sender 停流
       this.downloads.delete(connId);
+      try { ws.send(JSON.stringify({ t: 'abort', connId })); } catch {}
     }
   }
 
