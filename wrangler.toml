@@ -2,6 +2,11 @@ name = "cf-copy"
 main = "worker.js"
 compatibility_date = "2024-09-23"
 
+# 把 send.mjs 作为文本资源打包进 Worker，通过 /send.mjs 下发
+[[rules]]
+type = "Text"
+globs = ["**/*.mjs"]
+
 routes = [
   { pattern = "cf-copy.yuejw.ccwu.cc", custom_domain = true }
 ]

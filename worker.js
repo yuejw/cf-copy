@@ -16,6 +16,8 @@
 //                      {t:'ping'}
 //   二进制帧 = [4字节大端connId][数据chunk]，DO 剥掉前缀写入对应下载流
 
+import sendScript from './send.mjs';
+
 const HEARTBEAT_MS = 30_000;
 const DEAD_MS = 60_000;
 
@@ -40,6 +42,16 @@ export default {
     if (url.pathname === '/' || url.pathname === '/index.html') {
       return new Response(SENDER_PAGE_HTML, {
         headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+      });
+    }
+
+    // 客户端脚本下载（attachment 保证浏览器下载而不是当文本打开）
+    if (url.pathname === '/send.mjs') {
+      return new Response(sendScript, {
+        headers: {
+          'content-type': 'application/javascript; charset=utf-8',
+          'content-disposition': 'attachment; filename="send.mjs"',
+        },
       });
     }
 
@@ -370,13 +382,13 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
 </head>
 <body>
 <div class="wrap">
-  <h1>Cf-Copy 文件发送</h1>
+  <h1>利用cloudflare边缘计算进行文件发送</h1>
   <div class="sub">选择文件后生成下载链接发给对方。对方可用浏览器或任意下载工具（支持断点续传）接收。<br>进度含义：<b>已发送到服务器的字节数</b>——中间经过 Cloudflare 缓冲，最终是否送达以接收端下载完成为准（建议传完校验哈希）。</div>
 
   <div class="warn">⚠️ 发送期间请<b>保持本页面打开且在前台</b>：关闭、刷新或切到后台，都可能导致下载中断。<br>
   📌 <b>网页发送稳定性有限</b>（浏览器会冻结后台页面），<b>发送大文件建议使用客户端</b>：
-  <a href="https://github.com/yuejw/cf-copy/raw/main/send.mjs" style="color:#7a5b00">下载 send.mjs</a>（需安装 Node.js ≥ 22），然后执行：<br>
-  <code style="background:#fff6df;padding:2px 6px;border-radius:4px;display:inline-block;margin-top:4px">node .\send.mjs --server https://cf-copy.yuejw.ccwu.cc --key xxxxx</code></div>
+  <a href="/send.mjs" style="color:#7a5b00">下载 send.mjs</a>（需安装 Node.js ≥ 22），然后执行：<br>
+  <code style="background:#fff6df;padding:2px 6px;border-radius:4px;display:inline-block;margin-top:4px">node send.mjs --server https://cf-copy.yuejw.ccwu.cc --key xxxxx</code></div>
 
   <div class="panel">
     <div class="row">
