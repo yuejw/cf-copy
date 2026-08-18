@@ -23,7 +23,7 @@ node send.mjs --server https://cf-copy.yuejw.ccwu.cc
 
 运行后会打印一个下载地址，发给接收方用浏览器（或 curl/wget/IDM）打开即可，详见下方[使用](#使用)。
 
-> 公共服务即本项目作者自建的 Worker 实例，仅供试用；文件数据不经落盘、仅中转，但如介意可按下文自行部署。公共服务可能开启注册密码（`--key`，见[服务密码](#服务密码register_key可选)）。
+> 公共服务即本项目作者自建的 Worker 实例，**已开启注册密码：使用前请向作者（[@yuejw](https://github.com/yuejw)）索要 key**，并在命令中加上 `--key <索要到的key>`（详见[服务密码](#服务密码register_key可选)）。文件数据不经落盘、仅中转，但如介意可按下文自行部署。
 
 ## 架构
 
