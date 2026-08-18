@@ -475,47 +475,60 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
     var wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host +
                 '/register?id=' + channelId +
                 (rkInput.value.trim() ? '&rk=' + encodeURIComponent(rkInput.value.trim()) : '');
-    var ws = new WebSocket(wsUrl);
-    ws.binaryType = 'arraybuffer';
-    ch.ws = ws;
-
-    ws.onopen = function () {
-      badge.textContent = '等待下载';
+    var ws = null;
+    ch.connect = function () {
+      badge.textContent = '连接中…';
       badge.className = 'badge';
-      urlInput.value = dlUrl;
-      ws.send(JSON.stringify({ t: 'meta', name: file.name, size: file.size,
-        mime: file.type || 'application/octet-stream', key: dlKey }));
-      renderStats();
+      card.classList.remove('dead');
+      var s = new WebSocket(wsUrl);
+      ws = ch.ws = s;
+      s.binaryType = 'arraybuffer';
+
+      s.onopen = function () {
+        ch.retries = 0;
+        badge.textContent = '等待下载';
+        badge.className = 'badge';
+        urlInput.value = dlUrl;
+        s.send(JSON.stringify({ t: 'meta', name: file.name, size: file.size,
+          mime: file.type || 'application/octet-stream', key: dlKey }));
+        renderStats();
+      };
+      s.onclose = function (ev) {
+        if (ch.dead) return;
+        // 意外断开：把进行中的连接标记取消，然后自动重连（URL 不变）
+        ch.conns.forEach(function (c, id) { stopConnById(ch, id, '连接中断'); });
+        ch.retries = (ch.retries || 0) + 1;
+        var delay = Math.min(500 * ch.retries, 5000);
+        badge.textContent = '重连中… (' + ch.retries + ')';
+        badge.className = 'badge off';
+        setTimeout(function () { if (!ch.dead) ch.connect(); }, delay);
+      };
+      s.onerror = function () { setMsg('通道连接出错，正在自动重连…（请确认注册密码正确）'); };
+      s.onmessage = function (ev) {
+        if (typeof ev.data !== 'string') return;
+        var m;
+        try { m = JSON.parse(ev.data); } catch (e) { return; }
+        if (m.t === 'ping') { s.send(JSON.stringify({ t: 'pong' })); }
+        else if (m.t === 'download') startStream(ch, m.connId, m.offset, (m.end != null ? m.end : ch.file.size - 1));
+        else if (m.t === 'abort') stopConn(ch, m.connId, '已取消');
+      };
     };
-    ws.onclose = function (ev) {
-      if (ch.dead) return;
-      badge.textContent = '连接断开 (' + ev.code + ')';
-      badge.className = 'badge off';
-      card.classList.add('dead');
-      ch.conns.forEach(function (c) { c.ele.classList.add('cancel'); });
-    };
-    ws.onerror = function () { setMsg('通道连接失败：请检查注册密码是否正确、网络是否可用。'); };
-    ws.onmessage = function (ev) {
-      if (typeof ev.data !== 'string') return;
-      var m;
-      try { m = JSON.parse(ev.data); } catch (e) { return; }
-      if (m.t === 'ping') { ws.send(JSON.stringify({ t: 'pong' })); }
-      else if (m.t === 'download') startStream(ch, m.connId, m.offset, (m.end != null ? m.end : ch.file.size - 1));
-      else if (m.t === 'abort') stopConn(ch, m.connId, '已取消');
-    };
+    ch.connect();
 
     function renderStats() {
+      var w = ch.ws;
       var active = 0, sending = 0;
       ch.conns.forEach(function (c) { if (!c.stopped) active++; sending += c.sent; });
       badge.textContent = active ? (active + ' 人下载中') : '等待下载';
       badge.className = active ? 'badge live' : 'badge';
       statsEl.textContent = '累计发出 ' + fmt(ch.totalSent) +
-        ' · 发送缓冲 ' + fmt(ws.readyState === 1 ? ws.bufferedAmount : 0);
+        ' · 发送缓冲 ' + fmt(w && w.readyState === 1 ? w.bufferedAmount : 0);
     }
     var statsTimer = setInterval(renderStats, 500);
     removeBtn.addEventListener('click', function () { clearInterval(statsTimer); });
 
     async function startStream(c, connId, offset, end) {
+      var w = c.ws;
       var row = document.createElement('div');
       row.className = 'conn';
       row.innerHTML = '<div class="line"><span></span><span></span></div><div class="bar"><i></i></div>';
@@ -529,15 +542,15 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
 
       var pos = offset;
       try {
-        while (pos <= end && !st.stopped && ws.readyState === 1) {
-          if (ws.bufferedAmount > BUF_LIMIT) await waitBuffer(ws);
-          if (st.stopped || ws.readyState !== 1) break;
+        while (pos <= end && !st.stopped && w.readyState === 1) {
+          if (w.bufferedAmount > BUF_LIMIT) await waitBuffer(w);
+          if (st.stopped || w.readyState !== 1) break;
           var slice = c.file.slice(pos, Math.min(pos + CHUNK, end + 1));
           var buf = await slice.arrayBuffer();
           var frame = new Uint8Array(4 + buf.byteLength);
           new DataView(frame.buffer).setUint32(0, connId);
           frame.set(new Uint8Array(buf), 4);
-          ws.send(frame);
+          w.send(frame);
           pos += buf.byteLength;
           st.sent += buf.byteLength;
           c.totalSent += buf.byteLength;
@@ -555,7 +568,7 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
       row.classList.add('done');
       barFill.style.width = '100%';
       right.textContent = '完成 ✔';
-      ws.send(JSON.stringify({ t: 'eof', connId: connId }));
+      w.send(JSON.stringify({ t: 'eof', connId: connId }));
     }
 
     function stopConn(c, connId, text) {
@@ -566,6 +579,7 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
       st.ele.classList.add('cancel');
       st.ele.querySelectorAll('span')[1].textContent = text;
     }
+    function stopConnById(c, connId, text) { stopConn(c, connId, text); }
   }
 })();
 </script>
