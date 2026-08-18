@@ -21,10 +21,12 @@ const BUFFER_LIMIT = 8 * 1024 * 1024; // WS 发送缓冲上限，超过则暂停
 
 const args = process.argv.slice(2);
 let server = process.env.CFCOPY_SERVER || '';
+let registerKey = process.env.CFCOPY_KEY || '';
 let filePath = '';
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--server' && args[i + 1]) { server = args[++i]; }
+  else if (args[i] === '--key' && args[i + 1]) { registerKey = args[++i]; }
   else filePath = args[i];
 }
 
@@ -77,15 +79,16 @@ if ($dlg.ShowDialog() -eq 'OK') { Write-Output $dlg.FileName }
 
 // ---------- 注册并等待下载 ----------
 
-const channelId = crypto.randomBytes(4).toString('hex');       // 8 位通道 id
-const key = crypto.randomBytes(12).toString('base64url');      // 下载密钥
+const channelId = crypto.randomBytes(8).toString('hex');      // 16 位通道 id
+const key = crypto.randomBytes(12).toString('base64url');     // 下载密钥
 const fileName = path.basename(filePath);
 const size = stat.size;
 
 const mime = guessMime(fileName);
 const downloadUrl = `${server}/d/${channelId}/${key}`;
 
-const url = `${server}/register?id=${channelId}`;
+let url = `${server}/register?id=${channelId}`;
+if (registerKey) url += `&rk=${encodeURIComponent(registerKey)}`;
 console.log(`正在连接 ${server} ...`);
 
 const ws = new WebSocket(url);
@@ -126,7 +129,9 @@ ws.addEventListener('message', (ev) => {
 ws.addEventListener('close', (ev) => {
   for (const s of streams.values()) s.destroy();
   streams.clear();
-  console.error(`\n与服务器的连接已断开 (code=${ev.code}${ev.reason ? ', ' + ev.reason : ''})，退出。`);
+  let hint = '';
+  if (ev.code === 1006 && registerKey) hint = '（注意：服务器可能开启了 REGISTER_KEY 且 key 不匹配）';
+  console.error(`\n与服务器的连接已断开 (code=${ev.code}${ev.reason ? ', ' + ev.reason : ''})${hint}，退出。`);
   process.exit(1);
 });
 

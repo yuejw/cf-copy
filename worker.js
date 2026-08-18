@@ -40,6 +40,13 @@ export default {
     if (url.pathname === '/register') {
       const id = url.searchParams.get('id') || '';
       if (!/^[\w-]+$/.test(id)) return jsonResponse({ error: 'bad channel id' }, 400);
+      // 可选的服务密码：设置了 REGISTER_KEY 环境变量后，注册必须带上匹配的 rk 参数
+      if (env.REGISTER_KEY) {
+        const rk = url.searchParams.get('rk') || '';
+        if (rk !== env.REGISTER_KEY) {
+          return jsonResponse({ error: 'invalid register key' }, 403);
+        }
+      }
       const stub = env.RELAY_DO.get(env.RELAY_DO.idFromName(id));
       const doUrl = new URL(request.url);
       doUrl.pathname = '/register';

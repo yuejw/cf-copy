@@ -23,7 +23,7 @@ node send.mjs --server https://cf-copy.yuejw.ccwu.cc
 
 运行后会打印一个下载地址，发给接收方用浏览器（或 curl/wget/IDM）打开即可，详见下方[使用](#使用)。
 
-> 公共服务即本项目作者自建的 Worker 实例，仅供试用；文件数据不经落盘、仅中转，但如介意可按下文自行部署。
+> 公共服务即本项目作者自建的 Worker 实例，仅供试用；文件数据不经落盘、仅中转，但如介意可按下文自行部署。公共服务可能开启注册密码（`--key`，见[服务密码](#服务密码register_key可选)）。
 
 ## 架构
 
@@ -115,6 +115,30 @@ export CFCOPY_SERVER=https://cf-copy.<你的cf账号>.workers.dev
 node send.mjs big-file.zip
 ```
 
+## 服务密码（REGISTER_KEY，可选）
+
+公共服务开放到公网后，任何人都能往你的 Worker 注册通道、占用你的免费配额。设置 `REGISTER_KEY` 后，**只有带正确密码的发送端才能注册**，接收端下载不受影响：
+
+```bash
+# 1. 给 Worker 设置密码（secret 方式，不进代码库）
+wrangler secret put REGISTER_KEY
+# 按提示输入你想设的密码
+
+# 2. 重新部署使配置生效（secret 设置后一般无需重新 deploy，若不生效可重跑一次）
+wrangler deploy
+
+# 3. 发送端带上密码使用
+node send.mjs big-file.zip --server https://cf-copy.yuejw.ccwu.cc --key 你的密码
+# 或环境变量：
+export CFCOPY_KEY=你的密码
+```
+
+说明：
+
+- **不设置 `REGISTER_KEY` 时行为与之前完全一致**（开放注册），自建给自己用可以不设；
+- 密码只保护"注册通道"这一步；下载靠 URL 里的随机密钥保护，两者独立；
+- 密码经 HTTPS 传输，链路安全；把它给你信任的人，对方即可共用你的服务。
+
 运行后会打印下载地址：
 
 ```
@@ -158,3 +182,5 @@ wget -c "https://.../d/<id>/<key>"
 - 免费计划 Worker 请求数有每日限额（10 万次/天），但单个下载是一条长流，计为一次请求，正常使用远达不到上限。
 - 单文件大小无硬性限制（流式转发，不整载内存）；建议接收端使用支持续传的工具，网络闪断可自动恢复。
 - 通道密钥仅存在于 URL 中，请通过安全渠道（如自己另建的加密聊天）发给接收方。
+- 数据经 Cloudflare 中转（TLS 在边缘终结），并非端到端加密；传敏感文件建议先加密（如 7z 加密）再发送。
+- 公开服务建议设置[服务密码](#服务密码register_key可选)，防止他人占用配额。
