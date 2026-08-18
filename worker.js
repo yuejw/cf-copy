@@ -440,6 +440,24 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
     if (cardsBox.children.length) { e.preventDefault(); e.returnValue = ''; }
   });
 
+  // 所有进行中的通道：切回前台时若已断线则立即重连（后台冻结会暂停重连定时器）
+  var channels = [];
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      if (channels.some(function (c) { return !c.dead; })) {
+        setMsg('⚠️ 页面已进入后台：浏览器可能冻结本页导致发送中断，请保持页面在前台。');
+      }
+    } else {
+      setMsg('');
+      channels.forEach(function (c) {
+        if (!c.dead && c.ws && c.ws.readyState === 3) {
+          if (c.reconnectTimer) { clearTimeout(c.reconnectTimer); c.reconnectTimer = null; }
+          c.connect();
+        }
+      });
+    }
+  });
+
   function startFile(file) {
     if (remember.checked) localStorage.setItem('cfcopy_rk', rkInput.value.trim());
 
@@ -468,6 +486,7 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
     var copyBtn = card.querySelector('button.primary');
 
     var ch = { file: file, ws: null, conns: new Map(), totalSent: 0, dead: false };
+    channels.push(ch);
 
     copyBtn.onclick = function () {
       urlInput.select();
@@ -511,7 +530,7 @@ const SENDER_PAGE_HTML = `<!DOCTYPE html>
         var delay = Math.min(500 * ch.retries, 5000);
         badge.textContent = '重连中… (' + ch.retries + ')';
         badge.className = 'badge off';
-        setTimeout(function () { if (!ch.dead) ch.connect(); }, delay);
+        ch.reconnectTimer = setTimeout(function () { if (!ch.dead) ch.connect(); }, delay);
       };
       s.onerror = function () { setMsg('通道连接出错，正在自动重连…（请确认注册密码正确）'); };
       s.onmessage = function (ev) {
